@@ -1,3 +1,4 @@
+import google.generativeai as genai
 import os
 import time
 import json
@@ -133,17 +134,55 @@ class DataValidator:
         return raw_data
 
 class LLMAnalyzer:
+    def __init__(self):
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            logger.warning("⚠️ No GEMINI_API_KEY found! AI will fail.")
+        else:
+            genai.configure(api_key=api_key)
+        
+        # We use gemini-1.5-flash as it is extremely fast and reliable for JSON generation
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
+
     def generate_reasoning(self, financial_context, drhp_context):
-        return {
-            "executive_summary": "Solid growth but premium multiples.",
-            "bull_case": "High ROCE and low debt.",
-            "bear_case": "High dependence on top clients.",
-            "key_positives": ["Low Debt/Equity", "High ROE"],
-            "key_negatives": ["Aggressive valuation"],
-            "red_flags": ["Auditor turnover"],
-            "valuation_analysis": "Expensive",
-            "sentiment_score": 0.75
-        }
+        logger.info("🧠 Asking Gemini AI to analyze the IPO data...")
+        
+        prompt = f"""
+        You are an expert financial analyst evaluating an IPO. 
+        Based on the following financial and market data: {json.dumps(financial_context)}
+        
+        Provide a strict JSON response with exactly these keys:
+        - "executive_summary" (string)
+        - "bull_case" (string)
+        - "bear_case" (string)
+        - "key_positives" (list of strings)
+        - "key_negatives" (list of strings)
+        - "red_flags" (list of strings)
+        - "valuation_analysis" (string)
+        - "sentiment_score" (float between 0.0 and 1.0)
+        
+        Output ONLY valid JSON. Do not include markdown formatting or extra text.
+        """
+        
+        try:
+            # Force the AI to return a perfect JSON structure
+            response = self.model.generate_content(
+                prompt,
+                generation_config=genai.GenerationConfig(response_mime_type="application/json")
+            )
+            
+            ai_insights = json.loads(response.text)
+            logger.info("✅ Gemini AI successfully generated insights!")
+            return ai_insights
+            
+        except Exception as e:
+            logger.error(f"❌ AI Generation Failed: {e}")
+            return {
+                "executive_summary": "AI generation failed.",
+                "bull_case": "N/A", "bear_case": "N/A",
+                "key_positives": [], "key_negatives": [], "red_flags": [],
+                "valuation_analysis": "N/A", "sentiment_score": 0.5
+            }
 
 class IPOModelEngine:
     def __init__(self, version):
