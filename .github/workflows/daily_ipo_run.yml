@@ -36,8 +36,7 @@ jobs:
       # Step D: Run the orchestrator script we built!
       - name: Run IPO Analysis
         env:
-          # Securely inject your API keys so they aren't public in your code
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python run_ipo_analysis.py
