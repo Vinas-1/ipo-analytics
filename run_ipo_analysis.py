@@ -142,7 +142,7 @@ class LLMAnalyzer:
             genai.configure(api_key=api_key)
         
         # We use gemini-1.5-flash as it is extremely fast and reliable for JSON generation
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
     def generate_reasoning(self, financial_context, drhp_context):
         logger.info("🧠 Asking Gemini AI to analyze the IPO data...")
