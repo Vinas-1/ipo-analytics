@@ -141,11 +141,24 @@ class LLMAnalyzer:
         else:
             genai.configure(api_key=api_key)
         
-        # We use gemini-1.5-flash as it is extremely fast and reliable for JSON generation
-        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # 1. Ask Google's servers for a list of all currently active models
+        self.model_name = 'gemini-1.5-flash' # Absolute fallback
+        try:
+            available_models = genai.list_models()
+            for m in available_models:
+                # 2. Find the first model that supports text generation and is a fast "flash" model
+                if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
+                    self.model_name = m.name
+                    break
+            logger.info(f"🔎 Auto-detected available model: {self.model_name}")
+        except Exception as e:
+            logger.warning(f"Could not fetch model list: {e}")
+
+        # 3. Load the dynamically found model
+        self.model = genai.GenerativeModel(self.model_name)
 
     def generate_reasoning(self, financial_context, drhp_context):
-        logger.info("🧠 Asking Gemini AI to analyze the IPO data...")
+        logger.info(f"🧠 Asking {self.model_name} to analyze the IPO data...")
         
         prompt = f"""
         You are an expert financial analyst evaluating an IPO. 
@@ -165,7 +178,6 @@ class LLMAnalyzer:
         """
         
         try:
-            # Force the AI to return a perfect JSON structure
             response = self.model.generate_content(
                 prompt,
                 generation_config=genai.GenerationConfig(response_mime_type="application/json")
