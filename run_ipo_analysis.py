@@ -1,6 +1,8 @@
 import os
 import time
 import json
+import requests
+from bs4 import BeautifulSoup
 import logging
 import psycopg2
 
@@ -84,66 +86,69 @@ class PostgresClient:
         logger.error(f"Logged pipeline error for {ipo_symbol}: {error_msg}")
 
 # ==========================================
-# 2. MOCK DATA & AI ENGINES (FOR TESTING)
-# ==========================================
+# 2. Real Data
+class LiveDataScraper:
+    def __init__(self):
+        # We must use a User-Agent, otherwise financial websites will think we are a malicious bot and block us
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
 
-class APIFetcher:
     def discover_active_ipos(self):
-        return ["TECH_CORP_IPO", "SOLAR_SYS_IPO"]
+        # For our test, we will target an IPO name that currently exists on the target website
+        return ["Tata_Tech"] 
 
+    def get_gmp_data(self, ipo_symbol):
+        logger.info(f"🌐 Scraping live GMP data for {ipo_symbol}...")
+        
+        # This is a popular public URL for tracking GMP. You can change this to any site you prefer later.
+        url = "https://www.investorgain.com/report/live-ipo-gmp/331/"
+        
+        try:
+            # 1. Download the webpage
+            response = requests.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status() 
+            
+            # 2. Parse the HTML with BeautifulSoup
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # 3. Find the main data table on the page
+            table = soup.find('table', class_='table')
+            
+            if not table:
+                logger.warning("Could not find the GMP table in the HTML.")
+                return {"current_gmp": 0, "gmp_percent": 0.0}
+
+            # 4. Search row-by-row (<tr>) for our IPO symbol
+            search_name = ipo_symbol.split("_")[0] # E.g., searching for "Tata"
+            
+            for row in table.find_all('tr'):
+                if search_name.lower() in row.text.lower():  
+                    # Found the right row! Now extract the columns (<td>)
+                    columns = row.find_all('td')
+                    
+                    if len(columns) > 5:
+                        # Extract the exact column containing the GMP (Usually column index 4 on this site)
+                        # We clean the text by stripping out the '₹' symbol and commas to turn it into a real number
+                        gmp_text = columns[4].text.replace('₹', '').replace(',', '').strip()
+                        gmp_value = int(gmp_text) if gmp_text.isdigit() else 0
+                        
+                        logger.info(f"✅ Successfully scraped live GMP: ₹{gmp_value}")
+                        return {"current_gmp": gmp_value, "gmp_percent": 25.0} # Keeping percent mock for now
+            
+            logger.warning(f"IPO {ipo_symbol} not found in the live table.")
+            return {"current_gmp": 0, "gmp_percent": 0.0}
+
+        except Exception as e:
+            logger.error(f"❌ Scraping error: {e}")
+            return {"current_gmp": 0, "gmp_percent": 0.0}
+
+    # We will leave these as mock data for now while we test the GMP scraper
     def get_financials(self, ipo):
         return {"revenue_cr": 500, "pat_cr": 50, "debt_equity": 0.5, "roe": 18.5, "pe_ratio": 35.0}
 
-    def get_gmp_data(self, ipo):
-        return {"current_gmp": 120, "gmp_percent": 28.5}
-
     def get_subscription_data(self, ipo):
         return {"qib_x": 45.0, "nii_x": 12.0, "retail_x": 4.1}
-
-class DocumentExtractor:
-    @staticmethod
-    def extract_drhp(ipo):
-        return "DRHP document text placeholder..."
-
-class DataValidator:
-    def structure_payload(self, raw_data):
-        return raw_data
-
-class LLMAnalyzer:
-    def generate_reasoning(self, financial_context, drhp_context):
-        return {
-            "executive_summary": "Solid revenue growth but premium valuation multiples.",
-            "bull_case": "High ROCE and low debt provide runway for margin expansion.",
-            "bear_case": "High dependence on top clients poses downside risk.",
-            "key_positives": ["Low Debt/Equity", "High ROE"],
-            "key_negatives": ["Aggressive valuation"],
-            "red_flags": ["Auditor turnover in prior 2 years"],
-            "valuation_analysis": "Expensive",
-            "sentiment_score": 0.75
-        }
-
-class IPOModelEngine:
-    def __init__(self, version):
-        self.version = version
-
-    def calculate_scores(self, data, ai_sentiment):
-        return {
-            "listing_score": 82.5,
-            "long_term_score": 74.0,
-            "overall_rating": "🟢 Strong",
-            "sub_scores": {
-                "sentiment": 85.0,
-                "financial": 72.0,
-                "valuation": 60.0,
-                "governance": 75.0
-            }
-        }
-
-class NotificationService:
-    def check_and_trigger_alerts(self, ipo, scores, data):
-        if scores["listing_score"] > 80:
-            logger.info(f"🔔 ALERT: {ipo} crossed listing score threshold of 80!")
-
 # ==========================================
 # 3. PIPELINE ORCHESTRATOR
 # ==========================================
@@ -151,7 +156,7 @@ class NotificationService:
 class IPOAnalysisPipeline:
     def __init__(self):
         self.db = PostgresClient()
-        self.fetcher = APIFetcher()
+        self.fetcher = LiveDataScraper()
         self.validator = DataValidator()
         self.ai = LLMAnalyzer()
         self.scoring = IPOModelEngine(version="v2.4")
