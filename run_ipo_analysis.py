@@ -141,20 +141,8 @@ class LLMAnalyzer:
         else:
             genai.configure(api_key=api_key)
         
-        # 1. Ask Google's servers for a list of all currently active models
-        self.model_name = 'gemini-1.5-flash' # Absolute fallback
-        try:
-            available_models = genai.list_models()
-            for m in available_models:
-                # 2. Find the first model that supports text generation and is a fast "flash" model
-                if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
-                    self.model_name = m.name
-                    break
-            logger.info(f"🔎 Auto-detected available model: {self.model_name}")
-        except Exception as e:
-            logger.warning(f"Could not fetch model list: {e}")
-
-        # 3. Load the dynamically found model
+        # Hardcoding the exact model version Google's API instructed us to use
+        self.model_name = 'gemini-3.6-flash'
         self.model = genai.GenerativeModel(self.model_name)
 
     def generate_reasoning(self, financial_context, drhp_context):
@@ -195,7 +183,7 @@ class LLMAnalyzer:
                 "key_positives": [], "key_negatives": [], "red_flags": [],
                 "valuation_analysis": "N/A", "sentiment_score": 0.5
             }
-
+            
 class IPOModelEngine:
     def __init__(self, version):
         self.version = version
