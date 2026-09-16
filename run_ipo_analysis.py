@@ -84,7 +84,44 @@ class LiveDataScraper:
         }
 
     def discover_active_ipos(self):
-        return ["Tata_Tech"] 
+        logger.info("🔍 Scanning website for the latest IPOs...")
+        url = "https://www.investorgain.com/report/live-ipo-gmp/331/"
+        
+        try:
+            response = requests.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status() 
+            soup = BeautifulSoup(response.text, 'html.parser')
+            table = soup.find('table', class_='table')
+            
+            if not table:
+                logger.warning("Could not find the IPO table. Falling back to default.")
+                return ["Tata_Tech"]
+
+            active_ipos = []
+            
+            # Skip the header row, loop through the top data rows
+            for row in table.find_all('tr')[1:]:
+                columns = row.find_all('td')
+                if len(columns) > 0:
+                    # Extract the IPO name from the first column (e.g., "Bajaj Housing Finance IPO")
+                    raw_name = columns[0].text.strip()
+                    
+                    # Clean it up to use as our database ID: remove " IPO" and replace spaces with underscores
+                    clean_name = raw_name.replace(" IPO", "").replace(" SME", "").replace(" ", "_")
+                    
+                    if clean_name:
+                        active_ipos.append(clean_name)
+                
+                # SAFETY LIMIT: Only grab the top 3 most recent IPOs to prevent AI rate limit bans!
+                if len(active_ipos) >= 3:
+                    break
+                    
+            logger.info(f"🎯 Auto-discovered top IPOs: {active_ipos}")
+            return active_ipos
+
+        except Exception as e:
+            logger.error(f"❌ Failed to discover IPOs: {e}")
+            return ["Tata_Tech"] # Fallback so the script doesn't crash
 
     def get_gmp_data(self, ipo_symbol):
         logger.info(f"🌐 Scraping live GMP data for {ipo_symbol}...")
