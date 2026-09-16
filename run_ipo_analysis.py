@@ -274,6 +274,7 @@ class IPOAnalysisPipeline:
                 self.alerter.check_and_trigger_alerts(ipo, final_scores, validated_data)
 
                 logger.info(f"✅ Finished processing {ipo}")
+                time.sleep(15)
             except Exception as e:
                 logger.error(f"Pipeline failure on {ipo}: {e}")
                 self.db.log_pipeline_error(ipo, str(e))
