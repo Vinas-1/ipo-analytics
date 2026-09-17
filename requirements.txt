@@ -1,6 +1,6 @@
-requests==2.31.0
-beautifulsoup4==4.12.3
+requests
+beautifulsoup4
 psycopg2-binary
-google-generativeai==0.8.3
-streamlit==1.32.0
-pandas==2.2.1
+google-generativeai
+streamlit
+pandas
